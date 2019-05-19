@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:camel="http://camel.apache.org/schema/spring"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd   http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd   http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd   http://www.springframework.org/schema/osgi http://www.springframework.org/schema/osgi/spring-osgi.xsd   http://www.springframework.org/schema/osgi-compendium http://www.springframework.org/schema/osgi-compendium/spring-osgi-compendium.xsd">
+    <!-- The way properties are used changes WILDLY between deployment platforms.
+       Everything is handled automatically for you here
+       but pay attention to running on Fabric vs OpenShift vs Standalone.
+       The way properties are used here is NOT best practices for any of them
+       and is instead a mix because it is intended to demo on all of them. -->
+    <!-- set property values here so we don't have to recompile to change them -->
+    <!-- This reference just lets all of our routes use the same
+  connection pool set up in the mq-service project-->
+    <bean
+        class="org.apache.camel.dataformat.soap.name.ServiceInterfaceStrategy" id="serviceStrategy">
+        <constructor-arg value="com.sun.mdm.index.webservice.PersonEJB"/>
+        <constructor-arg value="true"/>
+    </bean>
+    <bean class="org.apache.activemq.ActiveMQConnectionFactory" id="connectionFactory">
+        <property name="brokerURL" value="tcp://localhost:61616"/>
+        <property name="userName" value="amqadmin"/>
+        <property name="password" value="r3dh4t"/>
+    </bean>
+    <!-- Pooled Connection Factory -->
+    <bean class="org.apache.activemq.pool.PooledConnectionFactory" id="pooledConnectionFactory">
+        <!--  A maximum of 10 connections can be opened on high volume -->
+        <property name="maxConnections" value="10"/>
+        <property name="connectionFactory" ref="connectionFactory"/>
+    </bean>
+    <bean class="org.apache.camel.component.jms.JmsConfiguration" id="jmsConfiguration">
+        <property name="connectionFactory" ref="pooledConnectionFactory"/>
+        <property name="transacted" value="false"/>
+        <!--  It will start at 3 parallel consumers -->
+        <property name="concurrentConsumers" value="3"/>
+        <!--  Once all the messages are sent or received, the client send
+		 acknowledgement to activemq -->
+        <property name="acknowledgementModeName" value="AUTO_ACKNOWLEDGE"/>
+    </bean>
+    <bean class="org.apache.activemq.camel.component.ActiveMQComponent" id="activemqSimple"/>
+    <bean class="org.apache.activemq.camel.component.ActiveMQComponent" id="activemqPool">
+        <property name="configuration" ref="jmsConfiguration"/>
+    </bean>
+    <camelContext id="outboundSOAP" trace="false" xmlns="http://camel.apache.org/schema/spring">
+        <propertyPlaceholder id="myPropertyPlaceholder" location="ref:outboundProps"/>
+         <dataFormats>
+            <jaxb contextPath="com.sun.mdm.index.webservice"
+                id="executeMatchFormat" partClass="com.sun.mdm.index.webservice.ExecuteMatchUpdate"/>
+        </dataFormats>
+        <!-- stream caching has to be enabled to process the message and log it from cxf -->
+        <route id="sendToNextGate" streamCache="true">
+            <from id="_from1" uri="activemqSimple:queue.person.nextgate.out"/>
+            <unmarshal id="_unmarshal1" ref="executeMatchFormat"/>
+            <to uri="cxf:localhost:8081/service" />
+        </route>
+        <route id="sendToJMS">
+        	<from id="_from2" uri="direct:sendToJMS"/>
+            <to uri="activemqSimple:queue.person.nextgate.dlq"/>
+        </route>
+        
+    </camelContext>
+</beans>
