@@ -42,7 +42,7 @@
     </bean>
     <camelContext id="outboundSOAP" trace="false" xmlns="http://camel.apache.org/schema/spring">
         <propertyPlaceholder id="myPropertyPlaceholder" location="ref:outboundProps"/>
-         <dataFormats>
+        <dataFormats>
             <jaxb contextPath="com.sun.mdm.index.webservice"
                 id="executeMatchFormat" partClass="com.sun.mdm.index.webservice.ExecuteMatchUpdate"/>
         </dataFormats>
@@ -50,12 +50,11 @@
         <route id="sendToNextGate" streamCache="true">
             <from id="_from1" uri="activemqSimple:queue.person.nextgate.out"/>
             <unmarshal id="_unmarshal1" ref="executeMatchFormat"/>
-            <to uri="cxf:localhost:8081/service" />
+            <to id="_to1" uri="cxf:localhost:8081/service"/>
         </route>
         <route id="sendToJMS">
-        	<from id="_from2" uri="direct:sendToJMS"/>
-            <to uri="activemqSimple:queue.person.nextgate.dlq"/>
+            <from id="_from2" uri="direct:sendToJMS"/>
+            <to id="_to2" uri="activemqSimple:queue.person.nextgate.dlq"/>
         </route>
-        
     </camelContext>
 </beans>

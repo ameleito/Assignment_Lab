@@ -3,30 +3,31 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd        http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
     <!-- This reference just lets all of our routes use the same connection 
 		pool set up in the mq-service project -->
-		
-    <bean id="jmsConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
-        <property name="brokerURL" value="tcp://localhost:61616" />
-        <property name="userName" value="amqadmin" />
-        <property name="password" value="r3dh4t" />
+    <bean class="org.apache.activemq.ActiveMQConnectionFactory" id="jmsConnectionFactory">
+        <property name="brokerURL" value="tcp://localhost:61616"/>
+        <property name="userName" value="amqadmin"/>
+        <property name="password" value="r3dh4t"/>
     </bean>
     <camelContext id="inboundRest" trace="false" xmlns="http://camel.apache.org/schema/spring">
-         <dataFormats>
+        <dataFormats>
             <xmljson id="xmljson"/>
-            <xmljson expandableProperties="d e" encoding="UTF-8" elementName="person"
-                forceTopLevelObject="true" id="xmljsonWithOptions"
-                removeNamespacePrefixes="true" rootName="persons"
-                skipNamespaces="true" trimSpaces="true"/>
+            <xmljson elementName="person" encoding="UTF-8"
+                expandableProperties="d e" forceTopLevelObject="true"
+                id="xmljsonWithOptions" removeNamespacePrefixes="true"
+                rootName="persons" skipNamespaces="true" trimSpaces="true"/>
         </dataFormats>
-<!--     <dataFormats>
+        <!--     <dataFormats>
             <jaxb contextPath="com.customer.app" id="personFormat" partClass="com.customer.app.Person"/>
         </dataFormats>
- -->        <!-- this is the route called by DEIMServiceImpl -->
+ -->
+        <!-- this is the route called by DEIMServiceImpl -->
         <!-- Here we receive the object will be send it to teh route, the reoute 
 			will be send it to amq. -->
-        <restConfiguration bindingMode="off" component="servlet"/>
+        <restConfiguration bindingMode="off" component="restlet"/>
         <rest id="id-9f8018ad-bca3-4ac7-b44d-4abb90245243" path="/service">
-            <post consumes="application/json" produces="application/json"
-                id="post-563ad899-8f6e-493c-92bc-7b185364aeb2" uri="/add">
+            <post consumes="application/json"
+                id="post-563ad899-8f6e-493c-92bc-7b185364aeb2"
+                produces="application/json" uri="/add">
                 <to uri="direct:deimInternal"/>
             </post>
             <post consumes="application/json"
@@ -41,27 +42,28 @@
         <route id="handleRest">
             <from id="_from1" uri="direct:deimInternal"/>
             <log id="_log2" loggingLevel="INFO" message="This is the body before convert ${body}"/>
-            <convertBodyTo type="java.lang.String"/>
+            <convertBodyTo id="_convertBodyTo1" type="java.lang.String"/>
             <log id="_log2" loggingLevel="INFO" message="This is the body after convert ${body}"/>
             <to id="_to1" uri="direct:unmarshalWithOptions"/>
-            <to uri="direct:sendDataAmq"/>
+            <to id="_to3" uri="direct:sendDataAmq"/>
             <log id="_log1" loggingLevel="INFO" message="updateAccount"/>
         </route>
         <route id="_route1">
-        	<from uri="direct:unmarshalWithOptions"/>
-            <unmarshal ref="xmljsonWithOptions"/>
+            <from id="_from2" uri="direct:unmarshalWithOptions"/>
+            <unmarshal id="_unmarshal1" ref="xmljsonWithOptions"/>
         </route>
         <route id="_route2">
-            <from uri="direct:marshalWithOptions"/>
-            <marshal ref="xmljson"/>
+            <from id="_from3" uri="direct:marshalWithOptions"/>
+            <marshal id="_marshal1" ref="xmljson"/>
         </route>
         <route id="_route3">
-            <from uri="direct:sendDataAmq"/>
-            <log loggingLevel="INFO" message="This is the body convert ${body}"/>
+            <from id="_from4" uri="direct:sendDataAmq"/>
+            <log id="_log3" loggingLevel="INFO" message="This is the body convert ${body}"/>
             <inOnly id="_to2" uri="activemq:queue.person.deim.in"/>
-            <setBody><simple>Done Transformation</simple></setBody>
-            <log loggingLevel="INFO" message="This is the body after ${body}"/>
+            <setBody id="_setBody1">
+                <simple>Done Transformation</simple>
+            </setBody>
+            <log id="_log4" loggingLevel="INFO" message="This is the body after ${body}"/>
         </route>
-
     </camelContext>
 </beans>
